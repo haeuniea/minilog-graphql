@@ -74,7 +74,7 @@ dependencies {
 
 	// GraphQL 의존성 추가
 	implementation 'org.springframework.boot:spring-boot-starter-graphql'
-	implementation 'com.graphql-java:graphql-java-extended-scalars'
+	implementation 'com.graphql-java:graphql-java-extended-scalars:24.0'
 
 	testImplementation 'org.springframework.graphql:spring-graphql-test'
 }
