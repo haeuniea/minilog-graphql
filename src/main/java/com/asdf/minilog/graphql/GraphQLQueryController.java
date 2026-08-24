@@ -7,13 +7,12 @@ import com.asdf.minilog.service.ArticleService;
 import com.asdf.minilog.service.FollowService;
 import com.asdf.minilog.service.UserService;
 import com.asdf.minilog.util.DtoGraphqlMapper;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Controller
 public class GraphQLQueryController {
@@ -23,7 +22,8 @@ public class GraphQLQueryController {
     private final UserService userService;
 
     @Autowired
-    public GraphQLQueryController(ArticleService articleService, FollowService followService, UserService userService) {
+    public GraphQLQueryController(
+            ArticleService articleService, FollowService followService, UserService userService) {
         this.articleService = articleService;
         this.followService = followService;
         this.userService = userService;
@@ -64,8 +64,6 @@ public class GraphQLQueryController {
 
     @QueryMapping
     public UserResponse getUserById(@Argument Long userId) {
-        return userService.getUserById(userId)
-                .map(DtoGraphqlMapper::toGraphql)
-                .orElse(null);
+        return userService.getUserById(userId).map(DtoGraphqlMapper::toGraphql).orElse(null);
     }
 }

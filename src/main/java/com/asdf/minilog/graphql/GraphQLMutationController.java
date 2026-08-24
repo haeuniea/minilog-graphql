@@ -26,14 +26,16 @@ public class GraphQLMutationController {
     private final UserService userService;
 
     @Autowired
-    public GraphQLMutationController(ArticleService articleService, FollowService followService, UserService userService) {
+    public GraphQLMutationController(
+            ArticleService articleService, FollowService followService, UserService userService) {
         this.articleService = articleService;
         this.followService = followService;
         this.userService = userService;
     }
 
     private MinilogUserDetails getCurrentUser() {
-        return (MinilogUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return (MinilogUserDetails)
+                SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     }
 
     @MutationMapping
@@ -54,15 +56,14 @@ public class GraphQLMutationController {
     @MutationMapping
     public Boolean deleteArticle(@Argument Long articleId) {
         MinilogUserDetails userDetails = getCurrentUser();
-        articleService.deleteArticle(userDetails.getId(),articleId);
+        articleService.deleteArticle(userDetails.getId(), articleId);
         return true;
     }
 
     @MutationMapping
     public FollowResponse follow(@Argument Long followeeId) {
         MinilogUserDetails userDetails = getCurrentUser();
-        return DtoGraphqlMapper.toGraphql(
-                followService.follow(userDetails.getId(), followeeId));
+        return DtoGraphqlMapper.toGraphql(followService.follow(userDetails.getId(), followeeId));
     }
 
     @MutationMapping

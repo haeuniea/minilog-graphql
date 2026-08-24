@@ -6,7 +6,6 @@ import com.asdf.minilog.dto.UserResponseDto;
 import com.asdf.minilog.graphql.response.ArticleResponse;
 import com.asdf.minilog.graphql.response.FollowResponse;
 import com.asdf.minilog.graphql.response.UserResponse;
-
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -31,9 +30,6 @@ public class DtoGraphqlMapper {
     }
 
     public static UserResponse toGraphql(UserResponseDto user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .build();
+        return UserResponse.builder().id(user.getId()).username(user.getUsername()).build();
     }
 }

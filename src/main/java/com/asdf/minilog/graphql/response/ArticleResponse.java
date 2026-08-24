@@ -1,10 +1,9 @@
 package com.asdf.minilog.graphql.response;
 
+import java.time.OffsetDateTime;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
-
-import java.time.OffsetDateTime;
 
 @Data
 @Builder
