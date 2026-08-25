@@ -1,9 +1,9 @@
-# Minilog JPA with Auth
+# Minilog GraphQL
 
-Spring Boot와 JPA를 활용하여 구현한 마이크로블로그 REST API 프로젝트입니다.
+Spring Boot와 JPA를 활용하여 구현한 마이크로블로그 API 프로젝트입니다.
 
-기존 Minilog JPA 프로젝트의 사용자, 게시글, 팔로우, 피드 기능에  
-Spring Security와 JWT를 적용하여 사용자 인증 및 권한 기반 인가 기능을 추가했습니다.
+기존 Minilog JPA with Auth 프로젝트의 사용자, 게시글, 팔로우, 피드, JWT 인증 기능을 유지하면서  
+Spring for GraphQL을 적용하여 GraphQL Query와 Mutation 기반 API를 추가했습니다.
 
 ## 개발 환경
 
@@ -13,10 +13,13 @@ Spring Security와 JWT를 적용하여 사용자 인증 및 권한 기반 인가
 - Spring Web MVC
 - Spring Data JPA
 - Spring Security
+- Spring for GraphQL
+- GraphQL Java Extended Scalars
 - JWT
 - MySQL 8
 - Lombok
 - Springdoc OpenAPI (Swagger)
+- GraphiQL
 - JUnit 5
 - Mockito
 - AssertJ
@@ -28,6 +31,7 @@ Spring Security와 JWT를 적용하여 사용자 인증 및 권한 기반 인가
 com.asdf.minilog
 ├── config
 │   ├── ApiDocumentationConfig
+│   ├── GraphQLConfig
 │   └── SecurityConfig
 ├── controller
 │   ├── AuthenticationController
@@ -53,7 +57,20 @@ com.asdf.minilog
 │   ├── UserNotFoundException
 │   ├── ArticleNotFoundException
 │   ├── NotAuthorizedException
-│   └── GlobalExceptionHandler
+│   ├── GlobalExceptionHandler
+│   └── MinilogGraphQLExceptionResolver
+├── graphql
+│   ├── GraphQLQueryController
+│   ├── GraphQLMutationController
+│   ├── input
+│   │   ├── CreateArticleInput
+│   │   ├── UpdateArticleInput
+│   │   ├── CreateUserInput
+│   │   └── UpdateUserInput
+│   └── response
+│       ├── ArticleResponse
+│       ├── FollowResponse
+│       └── UserResponse
 ├── repository
 │   ├── UserRepository
 │   ├── ArticleRepository
@@ -70,23 +87,52 @@ com.asdf.minilog
 │   ├── ArticleService
 │   └── FollowService
 ├── util
-│   └── EntityDtoMapper
+│   ├── EntityDtoMapper
+│   └── DtoGraphqlMapper
 └── MinilogApplication
+```
+
+GraphQL 스키마는 다음 경로에 정의합니다.
+
+```text
+src/main/resources/graphql/schema.graphqls
 ```
 
 ## 계층 구조
 
-기존 Minilog JPA 프로젝트의 Controller → Service → Repository 구조에  
-Spring Security 기반의 인증 및 인가 과정이 추가되었습니다.
+기존 REST API와 GraphQL API가 동일한 Service와 Repository 계층을 재사용합니다.
+
+```text
+REST Controller ─────┐
+                     ↓
+                   Service
+                     ↓
+                 Repository
+                     ↓
+                JPA / Hibernate
+                     ↓
+                   MySQL
+                     ↑
+                     │
+GraphQL Resolver ────┘
+```
+
+GraphQL 요청의 전체 흐름은 다음과 같습니다.
 
 ```text
 Client
-  ↓ HTTP Request + JWT
+  ↓ Authorization: Bearer JWT
 Spring Security
   ↓
-JWT 인증 / 인가
+JwtRequestFilter
   ↓
-Controller
+JWT 인증
+  ↓
+/graphql
+  ↓
+GraphQL Schema
+  ↓
+Query / Mutation Resolver
   ↓
 Service
   ↓
@@ -97,184 +143,65 @@ JPA / Hibernate
 MySQL
 ```
 
-JWT 인증에 성공하면 사용자의 인증 정보를 `SecurityContext`에 저장하고,  
-Controller에서는 `@AuthenticationPrincipal`을 이용하여 현재 로그인한 사용자 정보를 사용할 수 있습니다.
-
 ### 각 계층의 역할
 
 - **Security**: JWT 생성·검증 및 사용자 인증 처리
-- **Controller**: HTTP 요청 및 응답 처리, 인증된 사용자 정보 활용
+- **REST Controller**: 기존 REST API 요청 및 응답 처리
+- **GraphQL Resolver**: GraphQL Query / Mutation을 Java 로직과 연결
 - **Service**: 비즈니스 로직 및 데이터 소유권 기반 인가 처리
 - **Repository**: JPA를 이용한 데이터베이스 접근
 - **Entity**: 데이터베이스 테이블 및 연관관계 정의
-- **DTO**: API 요청 및 응답에 필요한 데이터 전달
-- **Mapper**: Entity와 DTO 간 변환
+- **DTO**: 기존 REST API 요청 및 응답 데이터 전달
+- **GraphQL Input / Response**: GraphQL 요청 및 응답 데이터 구조
+- **Mapper**: Entity, DTO, GraphQL Response 간 변환
 
 ## 주요 기능
 
-### 인증
+### GraphQL Query
 
-| HTTP Method | Endpoint | 기능 |
-| --- | --- | --- |
-| POST | `/api/v2/auth/login` | 로그인 및 JWT 발급 |
+- 사용자별 게시글 조회
+- 게시글 단건 조회
+- 피드 조회
+- 팔로잉 목록 조회
+- 사용자 목록 조회
+- 사용자 단건 조회
 
-### 사용자
+### GraphQL Mutation
 
-| HTTP Method | Endpoint | 기능 |
-| --- | --- | --- |
-| GET | `/api/v2/user` | 전체 사용자 조회 |
-| GET | `/api/v2/user/{userId}` | 특정 사용자 조회 |
-| POST | `/api/v2/user` | 사용자 생성 |
-| PUT | `/api/v2/user/{userId}` | 사용자 수정 |
-| DELETE | `/api/v2/user/{userId}` | 사용자 삭제 |
+- 게시글 생성 / 수정 / 삭제
+- 팔로우 / 언팔로우
+- 사용자 생성 / 수정 / 삭제
 
-### 게시글
+### 인증 및 인가
 
-| HTTP Method | Endpoint | 기능 |
-| --- | --- | --- |
-| POST | `/api/v2/article` | 게시글 생성 |
-| GET | `/api/v2/article/{articleId}` | 게시글 조회 |
-| PUT | `/api/v2/article/{articleId}` | 게시글 수정 |
-| DELETE | `/api/v2/article/{articleId}` | 게시글 삭제 |
-| GET | `/api/v2/article?authorId={authorId}` | 특정 사용자의 게시글 조회 |
-
-### 팔로우
-
-| HTTP Method | Endpoint | 기능 |
-| --- | --- | --- |
-| POST | `/api/v2/follow` | 사용자 팔로우 |
-| DELETE | `/api/v2/follow/{followeeId}` | 언팔로우 |
-| GET | `/api/v2/follow/{followerId}` | 팔로잉 목록 조회 |
-
-팔로우 및 언팔로우 시 `followerId`를 클라이언트가 직접 전달하지 않고,  
-`@AuthenticationPrincipal`을 통해 현재 로그인한 사용자의 ID를 사용합니다.
-
-### 피드
-
-| HTTP Method | Endpoint | 기능 |
-| --- | --- | --- |
-| GET | `/api/v2/feed?followerId={followerId}` | 팔로우한 사용자의 게시글 피드 조회 |
+- Spring Security + JWT 인증
+- `/graphql` 요청에 JWT 인증 적용
+- `SecurityContext`에서 현재 로그인 사용자 정보 조회
+- 게시글 작성자 및 팔로우 요청자 ID를 인증 정보에서 사용
 
 ## 주요 구현 내용
 
-- Spring Security를 이용한 인증 및 인가 구현
-- JWT 생성 및 검증
-- 로그인 성공 시 JWT 발급
-- `JwtRequestFilter`를 이용한 JWT 인증 처리
-- `SecurityContext`를 이용한 인증 정보 관리
-- `UserDetails`, `UserDetailsService`, `GrantedAuthority` 구현
-- BCrypt를 이용한 비밀번호 해시 저장 및 검증
-- `SecurityFilterChain`을 이용한 엔드포인트 접근 제어
-- `@AuthenticationPrincipal`을 이용한 현재 로그인 사용자 조회
-- `@PreAuthorize`를 이용한 권한 기반 접근 제어
-- `ROLE_AUTHOR`, `ROLE_ADMIN` 사용자 권한 관리
-- 게시글 수정 및 삭제 시 작성자 권한 검증
-- 인증 실패 시 `401 Unauthorized` 처리
-- Swagger UI에서 JWT 인증 지원
-- MockMvc, Mockito, Testcontainers를 이용한 테스트
+- Spring for GraphQL 적용
+- `schema.graphqls`를 이용한 GraphQL Schema 정의
+- Query / Mutation Resolver 구현
+- `@QueryMapping`, `@MutationMapping`, `@Argument` 적용
+- GraphQL Input / Response 타입 구현
+- `DtoGraphqlMapper`를 이용한 REST DTO → GraphQL Response 변환
+- 기존 Service / Repository 계층 재사용
+- `Long`, `DateTime` Custom Scalar 등록
+- `RuntimeWiringConfigurer`를 이용한 Custom Scalar 연결
+- `DataFetcherExceptionResolverAdapter`를 이용한 GraphQL 전역 예외 처리
+- 기존 Spring Security + JWT 인증 구조 연동
+- `SecurityContextHolder`를 이용한 현재 로그인 사용자 조회
+- GraphiQL을 이용한 Query / Mutation 테스트
 
-## JWT 인증 흐름
+## GraphQL 엔드포인트
 
-### 회원가입
-
-사용자의 비밀번호는 평문으로 저장하지 않고 BCrypt를 이용하여 해시 형태로 저장합니다.
-
-```text
-Client
-  ↓
-사용자 생성
-  ↓
-BCrypt 비밀번호 해시
-  ↓
-MySQL 저장
-```
-
-### 로그인
-
-사용자가 username과 password로 로그인하면 Spring Security가 사용자 정보를 조회하고 비밀번호를 검증합니다.
-
-```text
-Client
-  ↓ username / password
-AuthenticationController
-  ↓
-AuthenticationManager
-  ↓
-UserDetailsService
-  ↓
-DB 사용자 조회
-  ↓
-PasswordEncoder 비밀번호 검증
-  ↓
-인증 성공
-  ↓
-JwtUtil
-  ↓
-JWT 발급
-```
-
-### 인증 이후 요청
-
-로그인 이후 클라이언트는 발급받은 JWT를 `Authorization` 헤더에 포함하여 요청합니다.
-
-```text
-Client
-  ↓ Authorization: Bearer JWT
-JwtRequestFilter
-  ↓
-JWT 검증
-  ↓
-UserDetailsService로 사용자 조회
-  ↓
-Authentication 생성
-  ↓
-SecurityContext 저장
-  ↓
-인증 / 인가
-  ↓
-Controller
-  ↓
-Service
-  ↓
-Repository
-  ↓
-MySQL
-```
-
-게시글 생성, 수정, 삭제와 같이 현재 사용자의 정보가 필요한 기능에서는  
-`@AuthenticationPrincipal`을 통해 인증된 사용자의 ID를 사용합니다.
-
-## 인증 및 인가
-
-### 인증 (Authentication)
-
-현재 요청을 보낸 사용자가 누구인지 확인합니다.
-
-```text
-username / password
-→ 로그인 인증
-→ JWT 발급
-
-JWT
-→ JWT 검증
-→ Authentication
-→ SecurityContext
-```
-
-### 인가 (Authorization)
-
-인증된 사용자가 해당 작업을 수행할 권한이 있는지 확인합니다.
-
-- `SecurityFilterChain`: URL 수준의 접근 권한 관리
-- `@PreAuthorize`: 메서드 수준의 권한 검사
-- Service: 게시글 작성자 등 실제 데이터의 소유권 검사
-
-사용자 권한은 다음과 같이 구분합니다.
-
-- `ROLE_AUTHOR`
-- `ROLE_ADMIN`
-
-예를 들어 사용자 삭제 API는 `ROLE_ADMIN` 권한이 있는 사용자만 실행할 수 있습니다.
+| 경로 | 용도 |
+| --- | --- |
+| `/graphql` | 실제 GraphQL API 요청 |
+| `/graphiql` | GraphQL API 테스트 UI |
+| `/swagger-ui/index.html` | 기존 REST API 테스트 UI |
 
 ## 실행 방법
 
@@ -286,18 +213,15 @@ Docker를 이용하여 MySQL 컨테이너를 실행합니다.
 docker start mysql-minilog
 ```
 
-> 최초 실행 시에는 프로젝트에서 사용하는 MySQL 컨테이너를 먼저 생성해야 합니다.
-> Minilog용 Docker MySQL은 호스트의 3308 포트를 사용합니다.
-
->기존 Minilog JPA에서 생성한 사용자의 비밀번호는 BCrypt가 적용되어 있지 않으므로
->기존 사용자 데이터를 삭제하고 새로운 사용자를 생성하여 테스트합니다.
+> 최초 실행 시에는 프로젝트에서 사용하는 MySQL 컨테이너를 먼저 생성해야 합니다.  
+> Minilog용 Docker MySQL은 호스트의 `3308` 포트를 사용합니다.
 
 ### 2. 프로젝트 빌드
 
 WSL2 터미널에서 프로젝트 디렉토리로 이동하여 빌드합니다.
 
 ```bash
-cd ~/eog-springboot4/minilog-jpa-with-auth
+cd ~/eog-springboot4/minilog-graphql
 gradle build
 ```
 
@@ -309,20 +233,57 @@ gradle bootRun
 
 ### 4. Swagger UI 접속
 
-애플리케이션 실행 후 브라우저에서 Swagger UI에 접속하여 API를 확인하고 테스트할 수 있습니다.
+기존 REST API를 확인하고 테스트합니다.
 
 ```text
 http://localhost:8080/swagger-ui/index.html
 ```
 
-## JWT 인증 테스트
+### 5. GraphiQL 접속
 
-1. Swagger UI에서 `POST /api/v2/user`를 이용하여 신규 사용자를 생성합니다.
-2. `POST /api/v2/auth/login`으로 로그인합니다.
-3. 로그인 응답으로 발급된 JWT를 복사합니다.
-4. Swagger UI 상단의 **Authorize** 버튼을 클릭합니다.
-5. `bearerAuth`에 발급받은 JWT를 입력합니다.
-6. 인증이 필요한 API를 테스트합니다.
+GraphQL API를 확인하고 테스트합니다.
+
+```text
+http://localhost:8080/graphiql
+```
+
+## GraphQL 인증 테스트
+
+### 1. JWT 발급
+
+Swagger UI에서 다음 API를 이용하여 로그인합니다.
+
+```text
+POST /api/v2/auth/login
+```
+
+로그인 성공 시 반환된 JWT를 복사합니다.
+
+### 2. GraphiQL에 JWT 등록
+
+GraphiQL의 Request Headers에 다음과 같이 JWT를 입력합니다.
+
+```json
+{
+  "Authorization": "Bearer 발급받은_JWT"
+}
+```
+
+### 3. Query / Mutation 실행
+
+예를 들어 게시글을 조회할 수 있습니다.
+
+```graphql
+query {
+    getArticle(articleId: 1) {
+        articleId
+        content
+        authorName
+    }
+}
+```
+
+GraphQL에서는 응답 타입에 정의된 필드 중 필요한 필드만 선택하여 요청할 수 있습니다.
 
 ## 테스트
 
@@ -332,44 +293,29 @@ http://localhost:8080/swagger-ui/index.html
 gradle test
 ```
 
-주요 테스트 내용은 다음과 같습니다.
-
-- **Controller 테스트**
-    - MockMvc를 이용한 API 요청 및 응답 검증
-    - 사용자, 게시글, 피드 API의 상태 코드 및 응답 데이터 확인
-
-- **Service 테스트**
-    - 게시글 생성, 조회, 수정, 삭제 등의 비즈니스 로직 검증
-    - 팔로우 기반 피드 조회 동작 확인
-
-- **Entity 테스트**
-    - 사용자 Entity의 생성 및 동작 확인
-    - Entity 연관관계 동작 확인
-
-- **Application Context 테스트**
-    - Spring Application Context가 정상적으로 로드되는지 확인
+기존 Minilog의 Controller, Service, Entity 테스트를 유지하면서  
+GraphQL 적용 이후에도 기존 비즈니스 로직이 정상적으로 동작하는지 확인합니다.
 
 ## 학습 내용
 
-이 프로젝트를 통해 기존 Minilog JPA 프로젝트의 JPA 구조에 더해 다음 내용을 학습했습니다.
+이 프로젝트를 통해 기존 Minilog JPA with Auth 프로젝트의 기능에 더해 다음 내용을 학습했습니다.
 
-- Spring Security의 인증(Authentication)과 인가(Authorization)
-- `UserDetails`, `UserDetailsService`
-- `GrantedAuthority`
-- `Authentication`과 `SecurityContext`
-- `AuthenticationManager`
-- `PasswordEncoder`와 BCrypt를 이용한 비밀번호 해시
-- JWT 생성 및 검증
-- JWT 기반 Stateless 인증
-- `JwtRequestFilter`
-- `SecurityFilterChain`
-- `@AuthenticationPrincipal`
-- `@PreAuthorize`
-- 역할(Role) 기반 권한 관리
-- 데이터 소유권 기반 인가 처리
-- Swagger UI를 이용한 JWT 인증 테스트
-- MockMvc / Mockito를 이용한 Controller 테스트
-- Testcontainers를 이용한 데이터베이스 연동 테스트
+- GraphQL과 REST API의 차이
+- GraphQL Schema
+- Query / Mutation
+- Input Type / Response Type
+- Custom Scalar
+- Spring for GraphQL
+- `@QueryMapping`
+- `@MutationMapping`
+- `@Argument`
+- GraphQL Resolver
+- REST DTO와 GraphQL Response 간 변환
+- 기존 Service / Repository 재사용
+- GraphQL 전역 예외 처리
+- GraphQL과 Spring Security / JWT 연동
+- `SecurityContextHolder`를 이용한 인증 사용자 조회
+- GraphiQL을 이용한 GraphQL API 테스트
 
 ## 참고
 
@@ -378,4 +324,4 @@ gradle test
 교재의 예제를 기반으로 하되, 현재 학습 환경에 맞게 다음 사항을 변경하여 진행했습니다.
 
 - Spring Boot 3 → Spring Boot 4.1.0
-- Spring Boot 버전 변경에 따른 일부 의존성 및 코드 수정
+- Spring Boot 버전 변경에 따른 GraphQL 의존성 및 일부 코드 수정
